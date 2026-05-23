@@ -1,0 +1,118 @@
+schema_version: 1
+schema_variant: mapping
+page: 09_remediation
+component_under_test: remediation
+
+# Each entry passes a synthesized ScanResult to remediation.recommend(result)
+# and asserts that the recommended actions match the expected set.
+
+entries:
+  - id: rm-001
+    findings:
+      - { rule: override_ignore, category: instruction_override, score: 0.9 }
+    expected_recommendations:
+      - quarantine_source
+      - block_persistence_propagation
+      - flag_source_reputation
+    notes: 'Single override finding; standard containment recipe.'
+
+  - id: rm-002
+    findings:
+      - { rule: system_prompt_reveal, category: data_exfiltration, score: 0.9 }
+    expected_recommendations:
+      - scrub_outgoing_message
+      - log_attempt
+      - alert_security_team
+    notes: 'Prompt-reveal triggers data-leak posture: scrub + log + alert.'
+
+  - id: rm-003
+    findings:
+      - { rule: secret_exfil, category: data_exfiltration, score: 0.95 }
+      - { rule: url_side_channel, category: data_exfiltration, score: 0.9 }
+    expected_recommendations:
+      - rotate_credential
+      - add_url_to_egress_denylist
+      - alert_security_team
+    notes: 'Compound exfil + URL signal — credential treated as compromised.'
+
+  - id: rm-004
+    findings:
+      - { rule: persist_memory, category: persistence, score: 0.8 }
+    expected_recommendations:
+      - block_memory_write
+      - purge_prior_persisted_from_source
+      - flag_source_as_memory_targeting
+    notes: 'Memory-poisoning containment.'
+
+  - id: rm-005
+    findings:
+      - { rule: persist_future, category: persistence, score: 0.85 }
+    expected_recommendations:
+      - block_memory_write
+      - flag_source_for_cross_session_tracking
+      - verify_no_prior_cross_session_persistence
+    notes: 'Future-runs persistence requires cross-session sweep.'
+
+  - id: rm-006
+    findings:
+      - { rule: hidden_html_comment, category: structural_anomaly, score: 0.7 }
+    expected_recommendations:
+      - strip_html_comments
+      - flag_source_as_concealment_using
+    notes: 'Hidden-content concealment.'
+
+  - id: rm-007
+    findings:
+      - { rule: zero_width_chars, category: structural_anomaly, score: 0.7 }
+    expected_recommendations:
+      - normalize_text
+      - rescan_after_normalization
+      - report_unicode_evasion
+    notes: 'Unicode evasion remediation pipeline.'
+
+  - id: rm-008
+    findings:
+      - { rule: fake_system_tag, category: instruction_override, score: 0.75 }
+    expected_recommendations:
+      - strip_role_tags
+      - flag_source_as_role_impersonation
+    notes: 'Role-tag impersonation.'
+
+  - id: rm-009
+    findings:
+      - { rule: homograph_mixed_script, category: structural_anomaly, score: 0.6 }
+      - { rule: override_ignore, category: instruction_override, score: 0.9 }
+    expected_recommendations:
+      - normalize_to_ascii_or_nfkc
+      - flag_source_as_obfuscation_using
+      - consider_tightening_trust
+    notes: 'Cyrillic-Latin substitution; normalize + retighten trust.'
+
+  - id: rm-010
+    findings:
+      - { rule: override_ignore, category: instruction_override, score: 0.9 }
+      - { rule: secret_exfil, category: data_exfiltration, score: 0.95 }
+      - { rule: url_side_channel, category: data_exfiltration, score: 0.9 }
+    expected_recommendations:
+      - rotate_credential
+      - quarantine_source_permanently
+      - add_url_to_egress_denylist
+      - alert_security_team
+      - trigger_incident_response_runbook
+    severity: high
+    notes: 'Top-severity compound finding — full IR runbook.'
+
+  - id: rm-011
+    findings:
+      - { rule: supply_chain_signature, category: instruction_override, score: 0.85 }
+    expected_recommendations:
+      - quarantine_source
+      - check_provenance
+      - flag_upstream_feed_for_review
+      - consider_blocking_upstream_registry
+    notes: 'Supply-chain templates traced upstream.'
+
+  - id: rm-012
+    findings: []
+    expected_recommendations: []
+    notes: 'Benign control — no recommendation produced.'

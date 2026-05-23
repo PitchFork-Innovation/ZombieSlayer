@@ -43,35 +43,39 @@ _RULES: tuple[Rule, ...] = (
     ),
     Rule(
         "override_new_instructions",
-        re.compile(r"\b(?:new|updated|revised) instructions?\s*[:\-]", re.I),
+        re.compile(r"\b(?:new|updated|revised) instructions?\s*[:\-–—]", re.I),
         RiskCategory.INSTRUCTION_OVERRIDE, 0.5,
         "introduces 'new instructions' directive",
         kind="command",
     ),
     Rule(
         "role_reassignment",
-        re.compile(r"\byou are now\b|\bact as\b|\bpretend to be\b|\bfrom now on,? you\b", re.I),
+        re.compile(
+            r"\byou are now\b|\bact as\b|\bpretend to be\b|"
+            r"\b(?:from now on|from this point (?:on|forward)|going forward),? you\b",
+            re.I,
+        ),
         RiskCategory.INSTRUCTION_OVERRIDE, 0.55,
         "attempts to reassign agent role",
         kind="role",
     ),
     Rule(
         "system_prompt_reveal",
-        re.compile(r"\b(?:reveal|print|show|output|repeat) (?:your |the )?(?:system|initial|hidden) (?:prompt|instructions?)\b", re.I),
+        re.compile(r"\b(?:reveal|print|show|output|repeat) (?:me |us )?(?:your |the )?(?:system|initial|hidden) (?:prompt|instructions?)\b", re.I),
         RiskCategory.DATA_EXFILTRATION, 0.9,
         "requests disclosure of system/hidden prompt",
         kind="command",
     ),
     Rule(
         "secret_exfil",
-        re.compile(r"\b(?:send|email|post|upload|exfiltrate|leak) (?:.{0,40}?)(?:secret|api[_ ]?key|token|password|credentials?)\b", re.I),
+        re.compile(r"\b(?:send|email|post|upload|exfiltrate|leak) (?:.{0,40}?)(?:secrets?|api[_ ]?keys?|tokens?|passwords?|credentials?|card\s+numbers?|cvv|credit\s+cards?)\b", re.I),
         RiskCategory.DATA_EXFILTRATION, 0.95,
         "requests exfiltration of secrets/credentials",
         kind="secret",
     ),
     Rule(
         "url_side_channel",
-        re.compile(r"\b(?:fetch|GET|curl|navigate to|visit)\s+https?://\S+\?[^\s]*(?:data|secret|token|key|prompt)=", re.I),
+        re.compile(r"\b(?:fetch|GET|POST|curl|navigate to|visit)\s+https?://\S+\?[^\s]*(?:data|secret|token|key|prompt)=", re.I),
         RiskCategory.DATA_EXFILTRATION, 0.9,
         "URL appears to be a side-channel exfiltration endpoint",
         kind="url",
@@ -84,16 +88,21 @@ _RULES: tuple[Rule, ...] = (
         kind="command",
     ),
     Rule(
+        # Conservative score by design: a bare "remember this" is a weak
+        # signal. The `persistence_directive_payload` structural signal
+        # raises the aggregate only when the persisted content also carries
+        # agent-behavioral-control language. See Detector._persistence_directive.
         "persist_memory",
-        re.compile(r"\b(?:remember|memorize|store|save)\s+(?:this|the following|that)\b|\b(?:add|write) (?:to|into) (?:your )?memory\b", re.I),
-        RiskCategory.PERSISTENCE, 0.8,
+        re.compile(r"\b(?:remember|memorize|store|save)\s+(?:this|the following|that)\b|\b(?:add|write|save|store) (?:to|into) (?:your )?memory\b", re.I),
+        RiskCategory.PERSISTENCE, 0.45,
         "asks the agent to persist content into memory",
         kind="command",
     ),
     Rule(
+        # Conservative score — see persist_memory note above.
         "persist_future",
-        re.compile(r"\b(?:in (?:all )?future (?:runs|sessions|conversations))|\bfor (?:all|every) subsequent (?:task|run|session)\b", re.I),
-        RiskCategory.PERSISTENCE, 0.85,
+        re.compile(r"\b(?:in|for) (?:all )?future (?:runs?|sessions?|conversations?)\b|\bfor (?:all|every) subsequent (?:tasks?|runs?|sessions?)\b", re.I),
+        RiskCategory.PERSISTENCE, 0.45,
         "targets future runs/sessions",
         kind="command",
     ),
@@ -228,6 +237,32 @@ _RULES: tuple[Rule, ...] = (
 _ZERO_WIDTH = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]")
 
 
+# Agent-behavioral-control vocabulary. A persistence directive (persist_memory
+# / persist_future) is only treated as high-risk when the persisted content
+# *also* contains language like this \u2014 authority claims, safety-bypass, or
+# execution directives. This is what separates "remember my shopping list"
+# (benign) from "remember I'm an admin" (poisoning). See
+# Detector._persistence_directive.
+_PERSIST_DIRECTIVE_VOCAB = re.compile(
+    r"\b(?:"
+    r"admin(?:istrator|istrative)?|root\s+access|sudo|superuser|"
+    r"pre[-\s]?approv\w*|pre[-\s]?authoriz\w*|authoris\w*|authoriz\w*|"
+    r"full\s+(?:access|control|permission)|elevated|privileg\w*|"
+    r"bypass|"
+    r"skip(?:ping)?\s+(?:(?:the|all|any|standard)\s+)*"
+    r"(?:safety|confirmation|auth|check|warning|review|prompt)|"
+    r"without\s+(?:(?:additional|further|the|standard)\s+)*"
+    r"(?:confirmation|asking|prompting|review|sandbox\w*|check)|"
+    r"no\s+longer\s+(?:need|warn|emit)|"
+    r"disable\s+(?:(?:the|all)\s+)*(?:warning|safety|check|confirmation)|"
+    r"auto[-\s]?(?:approv\w*|accept\w*)|"
+    r"execute|invoke\s+arbitrary|rm\s+-rf|"
+    r"takes?\s+precedence|supersed\w*|override"
+    r")\b",
+    re.I,
+)
+
+
 # Sentence-level register signals. Used by `_denoising` to score each sentence
 # against the document baseline; a localized cluster that diverges sharply is
 # our stdlib stand-in for reconstruction error (PRD §14.3).
@@ -317,6 +352,7 @@ class Detector:
         base = self._run_rules(text)
         findings.extend(base)
         findings.extend(self._structural(text))
+        findings.extend(self._persistence_directive(text, base))
         findings.extend(self._denoising(text))
         findings.extend(self._decoded_findings(text))
         already_fired = {f.rule for f in base}
@@ -411,6 +447,40 @@ class Detector:
             ))
 
         return out
+
+    # ---- persistence directive payload ---------------------------------
+    def _persistence_directive(
+        self, text: str, base: list[Finding]
+    ) -> list[Finding]:
+        """Escalate persistence findings that carry agent-control language.
+
+        `persist_memory` / `persist_future` are intentionally low-scored —
+        persisting *data* (a shopping list, a language preference) is benign.
+        Persistence becomes an attack when the persisted content is a
+        *directive about the agent's behavior*: authority claims, safety
+        bypass, execution. This signal fires only when both are present, so
+        it raises the aggregate for poisoning attempts without flagging
+        ordinary personalization.
+        """
+        if not any(
+            f.rule in ("persist_memory", "persist_future") for f in base
+        ):
+            return []
+        m = _PERSIST_DIRECTIVE_VOCAB.search(text)
+        if m is None:
+            return []
+        return [Finding(
+            category=RiskCategory.PERSISTENCE,
+            reason=(
+                "persistence directive carries agent-behavioral-control "
+                f"language ({m.group(0)!r})"
+            ),
+            span=(m.start(), m.end()),
+            rule="persistence_directive_payload",
+            score=0.8,
+            kind="command",
+            family="structural",
+        )]
 
     # ---- denoising (unchanged) -----------------------------------------
     def _denoising(self, text: str) -> list[Finding]:
