@@ -1,0 +1,183 @@
+schema_version: 1
+schema_variant: matrix
+page: 06_trust_mode_matrix
+component_under_test: policy
+
+# Each prompt below carries a trust_matrix block instead of expected_action_untrusted.
+# Harness extension required: iterate (trust, mode) cells and rebuild Policy/Scanner each time.
+
+prompts:
+  - id: tm-001
+    label: malicious
+    text_ref: tm-001
+    expected_findings: [override_ignore, system_prompt_reveal]
+    expected_min_aggregate_score: 0.95
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: quarantine }
+      - { trust: untrusted,   mode: strict, expected_action: quarantine }
+      - { trust: retrieval,   mode: fast,   expected_action: quarantine }
+      - { trust: retrieval,   mode: strict, expected_action: quarantine }
+      - { trust: tool_output, mode: fast,   expected_action: quarantine }
+      - { trust: tool_output, mode: strict, expected_action: quarantine }
+      - { trust: developer,   mode: fast,   expected_action: quarantine }
+      - { trust: developer,   mode: strict, expected_action: quarantine }
+      - { trust: user,        mode: fast,   expected_action: quarantine }
+      - { trust: user,        mode: strict, expected_action: quarantine }
+
+  - id: tm-002
+    label: malicious
+    text_ref: tm-002
+    expected_findings: [override_ignore]
+    expected_min_aggregate_score: 0.85
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: quarantine }
+      - { trust: untrusted,   mode: strict, expected_action: quarantine }
+      - { trust: retrieval,   mode: fast,   expected_action: quarantine }
+      - { trust: retrieval,   mode: strict, expected_action: quarantine }
+      - { trust: tool_output, mode: fast,   expected_action: quarantine }
+      - { trust: tool_output, mode: strict, expected_action: quarantine }
+      - { trust: developer,   mode: fast,   expected_action: quarantine }
+      - { trust: developer,   mode: strict, expected_action: quarantine }
+      - { trust: user,        mode: fast,   expected_action: pass        }
+      - { trust: user,        mode: strict, expected_action: quarantine }
+    notes: 'Score ~0.9 sits between user-STRICT (0.8) and user-FAST (0.9). Pass under user-FAST.'
+
+  - id: tm-003
+    label: malicious
+    text_ref: tm-003
+    expected_findings: [system_prompt_reveal]
+    expected_min_aggregate_score: 0.85
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: quarantine }
+      - { trust: untrusted,   mode: strict, expected_action: quarantine }
+      - { trust: retrieval,   mode: fast,   expected_action: quarantine }
+      - { trust: retrieval,   mode: strict, expected_action: quarantine }
+      - { trust: tool_output, mode: fast,   expected_action: quarantine }
+      - { trust: tool_output, mode: strict, expected_action: quarantine }
+      - { trust: developer,   mode: fast,   expected_action: quarantine }
+      - { trust: developer,   mode: strict, expected_action: quarantine }
+      - { trust: user,        mode: fast,   expected_action: pass        }
+      - { trust: user,        mode: strict, expected_action: quarantine }
+
+  - id: tm-004
+    label: malicious
+    text_ref: tm-004
+    expected_findings: [role_reassignment]
+    expected_min_aggregate_score: 0.5
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: quarantine }
+      - { trust: untrusted,   mode: strict, expected_action: quarantine }
+      - { trust: retrieval,   mode: fast,   expected_action: pass        }
+      - { trust: retrieval,   mode: strict, expected_action: quarantine }
+      - { trust: tool_output, mode: fast,   expected_action: pass        }
+      - { trust: tool_output, mode: strict, expected_action: quarantine }
+      - { trust: developer,   mode: fast,   expected_action: pass        }
+      - { trust: developer,   mode: strict, expected_action: pass        }
+      - { trust: user,        mode: fast,   expected_action: pass        }
+      - { trust: user,        mode: strict, expected_action: pass        }
+    notes: 'Score ~0.55. Only quarantines in untrusted/tool_output-STRICT and untrusted-FAST.'
+
+  - id: tm-005
+    label: malicious
+    text_ref: tm-005
+    expected_findings: [override_new_instructions]
+    expected_min_aggregate_score: 0.45
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: pass        }
+      - { trust: untrusted,   mode: strict, expected_action: quarantine }
+      - { trust: retrieval,   mode: fast,   expected_action: pass        }
+      - { trust: retrieval,   mode: strict, expected_action: pass        }
+      - { trust: tool_output, mode: fast,   expected_action: pass        }
+      - { trust: tool_output, mode: strict, expected_action: quarantine }
+      - { trust: developer,   mode: fast,   expected_action: pass        }
+      - { trust: developer,   mode: strict, expected_action: pass        }
+      - { trust: user,        mode: fast,   expected_action: pass        }
+      - { trust: user,        mode: strict, expected_action: pass        }
+    notes: 'Score ~0.5 — only crosses untrusted-STRICT (0.35) and tool_output-STRICT (0.40).'
+
+  - id: tm-006
+    label: malicious
+    text_ref: tm-006
+    expected_findings: [persist_memory, persist_future]
+    expected_min_aggregate_score: 0.8
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: quarantine }
+      - { trust: untrusted,   mode: strict, expected_action: quarantine }
+      - { trust: retrieval,   mode: fast,   expected_action: quarantine }
+      - { trust: retrieval,   mode: strict, expected_action: quarantine }
+      - { trust: tool_output, mode: fast,   expected_action: quarantine }
+      - { trust: tool_output, mode: strict, expected_action: quarantine }
+      - { trust: developer,   mode: fast,   expected_action: pass        }
+      - { trust: developer,   mode: strict, expected_action: quarantine }
+      - { trust: user,        mode: fast,   expected_action: pass        }
+      - { trust: user,        mode: strict, expected_action: quarantine }
+
+  - id: tm-007
+    label: malicious
+    text_ref: tm-007
+    expected_findings: [override_ignore, secret_exfil, url_side_channel]
+    expected_min_aggregate_score: 0.98
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: quarantine }
+      - { trust: untrusted,   mode: strict, expected_action: quarantine }
+      - { trust: retrieval,   mode: fast,   expected_action: quarantine }
+      - { trust: retrieval,   mode: strict, expected_action: quarantine }
+      - { trust: tool_output, mode: fast,   expected_action: quarantine }
+      - { trust: tool_output, mode: strict, expected_action: quarantine }
+      - { trust: developer,   mode: fast,   expected_action: quarantine }
+      - { trust: developer,   mode: strict, expected_action: quarantine }
+      - { trust: user,        mode: fast,   expected_action: quarantine }
+      - { trust: user,        mode: strict, expected_action: quarantine }
+
+  - id: tm-008
+    label: malicious
+    text_ref: tm-008
+    expected_findings: [hidden_html_comment]
+    expected_min_aggregate_score: 0.65
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: quarantine }
+      - { trust: untrusted,   mode: strict, expected_action: quarantine }
+      - { trust: retrieval,   mode: fast,   expected_action: quarantine }
+      - { trust: retrieval,   mode: strict, expected_action: quarantine }
+      - { trust: tool_output, mode: fast,   expected_action: quarantine }
+      - { trust: tool_output, mode: strict, expected_action: quarantine }
+      - { trust: developer,   mode: fast,   expected_action: pass        }
+      - { trust: developer,   mode: strict, expected_action: pass        }
+      - { trust: user,        mode: fast,   expected_action: pass        }
+      - { trust: user,        mode: strict, expected_action: pass        }
+
+  - id: tm-009
+    label: malicious
+    text_ref: tm-009
+    expected_findings: [override_ignore]
+    expected_min_aggregate_score: 0.6
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: quarantine }
+      - { trust: untrusted,   mode: strict, expected_action: quarantine }
+      - { trust: retrieval,   mode: fast,   expected_action: pass        }
+      - { trust: retrieval,   mode: strict, expected_action: quarantine }
+      - { trust: tool_output, mode: fast,   expected_action: quarantine }
+      - { trust: tool_output, mode: strict, expected_action: quarantine }
+      - { trust: developer,   mode: fast,   expected_action: pass        }
+      - { trust: developer,   mode: strict, expected_action: pass        }
+      - { trust: user,        mode: fast,   expected_action: pass        }
+      - { trust: user,        mode: strict, expected_action: pass        }
+    notes: 'Pre-decode stage fires override_ignore on the Base64-decoded payload.'
+
+  - id: tm-010
+    label: benign
+    text_ref: tm-010
+    expected_findings: []
+    expected_max_aggregate_score: 0.1
+    trust_matrix:
+      - { trust: untrusted,   mode: fast,   expected_action: pass }
+      - { trust: untrusted,   mode: strict, expected_action: pass }
+      - { trust: retrieval,   mode: fast,   expected_action: pass }
+      - { trust: retrieval,   mode: strict, expected_action: pass }
+      - { trust: tool_output, mode: fast,   expected_action: pass }
+      - { trust: tool_output, mode: strict, expected_action: pass }
+      - { trust: developer,   mode: fast,   expected_action: pass }
+      - { trust: developer,   mode: strict, expected_action: pass }
+      - { trust: user,        mode: fast,   expected_action: pass }
+      - { trust: user,        mode: strict, expected_action: pass }
+    notes: 'Universal pass — verifies the policy doesn''t quarantine on benign content even at the strictest setting.'

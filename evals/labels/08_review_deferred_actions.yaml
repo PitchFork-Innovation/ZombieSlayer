@@ -1,0 +1,96 @@
+schema_version: 1
+schema_variant: trace
+page: 08_review_deferred_actions
+component_under_test: review_and_plugin
+defaults:
+  trust: untrusted
+  mode: fast
+
+# Each scenario describes a trace and an expected end-state. The harness will
+# need a plugin adapter that drives ZombieSlayer through the events.
+
+scenarios:
+  - id: rv-001
+    label: malicious
+    review_action: exclude
+    expected_in_context: false
+    expected_approved_text_accessible: false
+    notes: 'EXCLUDE drops the item; no approved_text exposed.'
+
+  - id: rv-002
+    label: false_positive
+    review_action: include
+    expected_in_context: true
+    expected_approved_text_accessible: true
+    expected_approved_text_equals_original: true
+    notes: 'INCLUDE restores the verbatim original on FP overrides.'
+
+  - id: rv-003
+    label: malicious_with_clean_remainder
+    review_action: reprocess_clean
+    expected_in_context: true
+    expected_approved_text_accessible: true
+    expected_sanitized: true
+    expected_approved_text_contains_payload: false
+    notes: 'REPROCESS_CLEAN preserves benign surroundings; payload stripped.'
+
+  - id: rv-004
+    label: malicious
+    review_action: pending
+    expected_in_context: false
+    expected_approved_text_accessible: false
+    notes: 'No reviewer action yet → accessors must not return text.'
+
+  - id: rv-005
+    label: mixed_batch
+    review_actions:
+      - { id: a, action: exclude }
+      - { id: b, action: exclude }
+      - { id: c, action: exclude }
+      - { id: d, action: include }
+      - { id: e, action: reprocess_clean }
+    expected_summary_categories:
+      instruction_override: 2
+      data_exfiltration: 1
+      persistence: 1
+      structural_anomaly: 1
+    notes: 'Verifies ReviewSummary.render() counts and per-item action display.'
+
+  - id: rv-006
+    label: malicious_buried_in_long_doc
+    review_action: reprocess_clean
+    expected_in_context: true
+    expected_sanitized: true
+    expected_approved_text_shorter_than_original: true
+    expected_id_preserved: true
+    notes: 'Sanitization shortens text; id stays stable for tracing.'
+
+  - id: rv-007
+    label: malicious_pure_payload
+    review_action: reprocess_clean
+    expected_action_rejected_or_empty: true
+    notes: 'Sanitization cannot succeed when there''s no benign content to keep.'
+
+  - id: rv-008
+    label: deferred_blocked
+    sources_quarantined: [a]
+    derived_action: b
+    source_review_actions: {}
+    expected_action_b_state: deferred
+    notes: 'B blocked until A is reviewed.'
+
+  - id: rv-009
+    label: deferred_released
+    sources_quarantined: [a]
+    derived_action: b
+    source_review_actions: { a: include }
+    expected_action_b_state: released
+    notes: 'B released after INCLUDE on A.'
+
+  - id: rv-010
+    label: deferred_cancelled
+    sources_quarantined: [a]
+    derived_action: b
+    source_review_actions: { a: exclude }
+    expected_action_b_state: cancelled
+    notes: 'B permanently cancelled after EXCLUDE on A — even subsequent reviewer activity on unrelated items must not release B.'
