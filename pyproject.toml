@@ -22,7 +22,9 @@ vision = [
     "pytesseract>=0.3.10",
     "anthropic>=0.40",
     "python-magic>=0.4",
+    "segno>=1.5",
 ]
+evals = ["pyyaml>=6"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

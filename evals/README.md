@@ -223,7 +223,7 @@ evals/labels/images.yaml         ← per-image expected vision-engine findings
 Generate the fixtures:
 
 ```
-pip install Pillow piexif segno      # or: pip install -e ".[vision]"
+pip install -e ".[vision]"           # or: pip install Pillow piexif segno
 python tools/build_images.py
 ```
 
@@ -260,7 +260,7 @@ header comment in `images.yaml` for the exact snippet.
 ## Running the harness
 
 ```
-pip install pyyaml
+pip install -e ".[evals]"                 # or: pip install pyyaml
 python evals/run_corpus.py                # all pages
 python evals/run_corpus.py 01             # one page
 python evals/run_corpus.py 01 --verbose   # plus per-prompt diagnostics
